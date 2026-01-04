@@ -1,0 +1,10 @@
+# Netlify configuration
+# This file ensures robots.txt and sitemap.xml are served correctly
+# and prevents SPA routing from interfering with static files
+
+/robots.txt /robots.txt 200
+/sitemap.xml /sitemap.xml 200
+/og-image.jpg /og-image.jpg 200
+/favicon.ico /favicon.ico 200
+/apple-touch-icon.png /apple-touch-icon.png 200
+/* /index.html 200

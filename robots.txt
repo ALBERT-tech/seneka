@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /private/
+Disallow: /.netlify/
+Disallow: /.git/
+
+# Sitemap location
+Sitemap: https://seneka.netlify.app/sitemap.xml
+
+# Crawl delay to prevent overloading
+Crawl-delay: 1
