@@ -919,32 +919,24 @@
 
         const text = buildShareText();
 
-        // === A. Внутри Telegram (Mini App) ===
-        if (inTelegram && tg) {
-            const storyUrl = SITE_URL + '/stories/' + currentIndex + '.jpg';
-
-            // A1) Публикация готовой картинки в историю (мобильный Telegram)
-            const storySupported = typeof tg.shareToStory === 'function' &&
-                (!tg.isVersionAtLeast || tg.isVersionAtLeast('8.0'));
-            if (storySupported) {
-                try {
-                    tg.shareToStory(storyUrl, { text: 'Больше мудрости — @seneka_1_bot' });
-                    return;
-                } catch (err) {
-                    console.error('shareToStory недоступен:', err);
-                }
-            }
-
-            // A2) Фолбэк в Telegram (напр. Web, где истории может не быть):
-            //     переслать цитату + ссылку на бота в выбранный чат
-            if (typeof tg.openTelegramLink === 'function') {
-                tg.openTelegramLink('https://t.me/share/url?url=' +
-                    encodeURIComponent(BOT_URL) + '&text=' + encodeURIComponent(text));
+        // === A. Мобильный Telegram — публикация картинки прямо в историю ===
+        // shareToStory работает только в мобильном приложении Telegram;
+        // в Web/Desktop он есть, но ничего не делает — туда не идём.
+        if (inTelegram && tg && (tg.platform === 'ios' || tg.platform === 'android') &&
+            typeof tg.shareToStory === 'function' &&
+            (!tg.isVersionAtLeast || tg.isVersionAtLeast('8.0'))) {
+            try {
+                tg.shareToStory(SITE_URL + '/stories/' + currentIndex + '.jpg',
+                    { text: 'Больше мудрости — @seneka_1_bot' });
                 return;
+            } catch (err) {
+                console.error('shareToStory:', err);
             }
         }
 
-        // === B. Обычный браузер ===
+        // === B. Обычный браузер и Web/Desktop Telegram ===
+        // (в Web/Desktop Telegram истории из Mini App нет — используем
+        //  системный «Поделиться»: уйдёт картинка либо текст со ссылкой на бота)
         // Готовим картинку
         let file = null;
         try {
