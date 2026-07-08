@@ -928,7 +928,13 @@
             typeof tg.shareToStory === 'function' &&
             (!tg.isVersionAtLeast || tg.isVersionAtLeast('8.0'))) {
             try {
-                tg.shareToStory(SITE_URL + '/stories/' + currentIndex + '.jpg');
+                tg.shareToStory(SITE_URL + '/stories/' + currentIndex + '.jpg', {
+                    // Подпись к истории: @-упоминание бота кликабельно у всех пользователей
+                    text: 'Больше мудрости стоиков — @seneka_1_bot',
+                    // Ссылка-виджет на бота (кликабельна; Telegram добавляет её только Premium-подписчикам,
+                    //  остальным просто не показывает — ошибки нет)
+                    widget_link: { url: BOT_URL, name: 'Сенека' }
+                });
                 return;
             } catch (err) {
                 console.error('shareToStory:', err);
