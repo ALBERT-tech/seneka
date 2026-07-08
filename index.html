@@ -739,11 +739,9 @@
         toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    // Формируем текст для отправки
+    // Текст-подпись для истории / сообщения
     function buildShareText() {
-        return '«' + currentQuote + '»\n\n— Луций Анней Сенека\n\n'
-             + 'Ещё мудрость: ' + SITE_URL + '\n'
-             + 'Бот в Telegram: ' + BOT_URL;
+        return '«' + currentQuote + '»\n— Луций Анней Сенека\n\nБольше мудрости: ' + BOT_URL;
     }
 
     // Копирование в буфер обмена с фолбэком для старых браузеров
@@ -768,7 +766,133 @@
         });
     }
 
-    // Поделиться цитатой
+    // Разбивка текста на строки по ширине (для рисования на canvas)
+    function wrapText(ctx, text, maxWidth) {
+        const words = text.split(' ');
+        const lines = [];
+        let line = '';
+        for (const word of words) {
+            const test = line ? line + ' ' + word : word;
+            if (ctx.measureText(test).width > maxWidth && line) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = test;
+            }
+        }
+        if (line) lines.push(line);
+        return lines;
+    }
+
+    // Рисуем вертикальную картинку 1080×1920 с цитатой — для истории Telegram
+    function renderStoryCanvas(quote) {
+        const W = 1080, H = 1920;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const serif = 'Georgia, "Times New Roman", serif';
+        const ink = '#2c1810', accent = '#8b4513';
+
+        // Фон-пергамент
+        ctx.fillStyle = '#f4e4bc';
+        ctx.fillRect(0, 0, W, H);
+
+        // Крупная полупрозрачная Σ по центру
+        ctx.save();
+        ctx.fillStyle = 'rgba(44,24,16,0.05)';
+        ctx.font = 'bold 1300px ' + serif;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Σ', W / 2, H / 2 + 30);
+        ctx.restore();
+
+        // Рамка + уголки
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(50, 50, W - 100, H - 100);
+        ctx.lineWidth = 8;
+        const c = 60;
+        function corner(x, y, dx, dy) {
+            ctx.beginPath();
+            ctx.moveTo(x, y + dy * c);
+            ctx.lineTo(x, y);
+            ctx.lineTo(x + dx * c, y);
+            ctx.stroke();
+        }
+        corner(50, 50, 1, 1);
+        corner(W - 50, 50, -1, 1);
+        corner(50, H - 50, 1, -1);
+        corner(W - 50, H - 50, -1, -1);
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = ink;
+
+        // Заголовок
+        ctx.letterSpacing = '14px';
+        ctx.font = 'bold 78px ' + serif;
+        ctx.fillText('СЕНЕКА', W / 2 + 7, 250);
+        ctx.letterSpacing = '0px';
+        ctx.globalAlpha = 0.8;
+        ctx.font = 'italic 40px ' + serif;
+        ctx.fillText('Мудрость стоика', W / 2, 312);
+        ctx.globalAlpha = 1;
+
+        // Цитата — подбираем размер шрифта, чтобы вошла в область
+        const maxWidth = W - 240;
+        const topLimit = 520, bottomLimit = 1470;
+        let fontSize = 84, lines = [];
+        for (; fontSize >= 38; fontSize -= 2) {
+            ctx.font = 'italic ' + fontSize + 'px ' + serif;
+            lines = wrapText(ctx, '«' + quote + '»', maxWidth);
+            if (lines.length * fontSize * 1.4 <= (bottomLimit - topLimit)) break;
+        }
+        const lineH = fontSize * 1.4;
+        let y = (topLimit + bottomLimit) / 2 - (lines.length - 1) * lineH / 2;
+        ctx.font = 'italic ' + fontSize + 'px ' + serif;
+        for (const line of lines) {
+            ctx.fillText(line, W / 2, y);
+            y += lineH;
+        }
+
+        // Автор
+        ctx.letterSpacing = '6px';
+        ctx.font = 'bold 34px ' + serif;
+        ctx.fillText('ЛУЦИЙ АННЕЙ СЕНЕКА', W / 2 + 3, 1600);
+        ctx.letterSpacing = '0px';
+
+        // Ссылка на бота
+        ctx.fillStyle = accent;
+        ctx.font = 'bold 42px ' + serif;
+        ctx.fillText('@seneka_1_bot', W / 2, 1770);
+        ctx.fillStyle = ink;
+        ctx.globalAlpha = 0.7;
+        ctx.font = '30px ' + serif;
+        ctx.fillText('seneka.netlify.app', W / 2, 1818);
+        ctx.globalAlpha = 1;
+
+        return canvas;
+    }
+
+    function canvasToBlob(canvas) {
+        return new Promise(function (resolve) {
+            canvas.toBlob(function (b) { resolve(b); }, 'image/png');
+        });
+    }
+
+    function downloadBlob(blob, name) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+
+    // Поделиться цитатой-картинкой (для истории Telegram) с фолбэками
     async function shareQuote() {
         // Если цитата ещё не выбрана — сначала показываем случайную
         if (!currentQuote) {
@@ -783,28 +907,47 @@
 
         const text = buildShareText();
 
-        // Нативное меню «Поделиться» (мобильные и часть десктопов)
-        if (navigator.share) {
+        // Готовим картинку
+        let file = null;
+        try {
+            const blob = await canvasToBlob(renderStoryCanvas(currentQuote));
+            if (blob) file = new File([blob], 'seneca.png', { type: 'image/png' });
+        } catch (err) {
+            console.error('Не удалось нарисовать картинку:', err);
+        }
+
+        // 1) Делимся картинкой: на телефоне откроется меню → Telegram → «В историю»
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
-                await navigator.share({
-                    title: 'Сенека — мудрость стоика',
-                    text: text,
-                    url: SITE_URL
-                });
+                await navigator.share({ files: [file], text: text });
                 return;
             } catch (err) {
-                // Пользователь отменил — тихо выходим
                 if (err && err.name === 'AbortError') return;
-                // Иначе пробуем скопировать
             }
         }
 
-        // Фолбэк — копируем в буфер обмена
+        // 2) Нативное меню «Поделиться» без картинки (текст + ссылка)
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'Сенека — мудрость стоика', text: text, url: SITE_URL });
+                return;
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+        }
+
+        // 3) Фолбэк (десктоп): сохраняем картинку и копируем текст
+        if (file) {
+            downloadBlob(file, 'seneca.png');
+            try { await copyToClipboard(text); } catch (e) {}
+            showToast('Картинка сохранена, текст скопирован');
+            return;
+        }
         try {
             await copyToClipboard(text);
             showToast('Цитата скопирована в буфер обмена');
         } catch (err) {
-            showToast('Не удалось скопировать цитату');
+            showToast('Не удалось поделиться');
         }
     }
 
