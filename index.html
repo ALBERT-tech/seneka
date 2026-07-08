@@ -37,8 +37,9 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://seneka.netlify.app">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <!-- Favicon (греческая буква Σ — сигма) -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     
     <!-- Structured Data (JSON-LD) -->
@@ -60,7 +61,6 @@
     </script>
     
     <title>Сенека — мудрость стоика</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
         :root {
@@ -176,6 +176,76 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.15);
         }
 
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Второстепенная кнопка «Поделиться» */
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-color);
+            border: 2px solid var(--text-color);
+            padding: 14px 30px;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        /* Ссылка на телеграм-бота */
+        .tg-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 25px;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+            color: var(--link-color);
+            text-decoration: none;
+            border-bottom: 1px dashed var(--link-color);
+            transition: color 0.2s;
+        }
+
+        .tg-link:hover {
+            color: var(--accent-color);
+            border-bottom-style: solid;
+        }
+
+        .tg-link svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        /* Всплывающее уведомление (тост) */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%) translateY(20px);
+            background-color: var(--text-color);
+            color: var(--bg-color);
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 100;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
         .footer {
             margin-top: 50px;
             font-size: 0.85rem;
@@ -228,16 +298,30 @@
 
     <div class="author">Луций Анней Сенека</div>
 
-    <button class="btn" id="btn">НОВАЯ МУДРОСТЬ</button>
+    <div class="actions">
+        <button class="btn" id="btn">НОВАЯ МУДРОСТЬ</button>
+        <button class="btn btn-secondary" id="shareBtn">ПОДЕЛИТЬСЯ</button>
+    </div>
+
+    <a class="tg-link" href="https://t.me/seneka_1_bot" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+        Больше мудрости в боте «Сенека»
+    </a>
 
     <div class="footer">
         Разработано в лаборатории <a href="https://t.me/tickettotender" target="_blank">Тендеры ex machina</a>
     </div>
 </div>
 
+<div class="toast" id="toast">Цитата скопирована в буфер обмена</div>
+
 <script>
     let quotes = [];
     let isLoaded = false;
+    let currentQuote = '';
+
+    const SITE_URL = 'https://seneka.netlify.app';
+    const BOT_URL = 'https://t.me/seneka_1_bot';
 
     // 1. Загружаем файл seneca-quotes.txt
     fetch('seneca-quotes.txt')
@@ -272,12 +356,93 @@
 
         setTimeout(() => {
             const randomIndex = Math.floor(Math.random() * quotes.length);
-            quoteElement.textContent = quotes[randomIndex];
+            currentQuote = quotes[randomIndex];
+            quoteElement.textContent = currentQuote;
             quoteElement.style.opacity = '1';
         }, 250);
     }
 
+    // Показ всплывающего уведомления
+    let toastTimer;
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // Формируем текст для отправки
+    function buildShareText() {
+        return '«' + currentQuote + '»\n\n— Луций Анней Сенека\n\n'
+             + 'Ещё мудрость: ' + SITE_URL + '\n'
+             + 'Бот в Telegram: ' + BOT_URL;
+    }
+
+    // Копирование в буфер обмена с фолбэком для старых браузеров
+    function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise((resolve, reject) => {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                resolve();
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    // Поделиться цитатой
+    async function shareQuote() {
+        // Если цитата ещё не выбрана — сначала показываем случайную
+        if (!currentQuote) {
+            if (!isLoaded || quotes.length === 0) {
+                showToast('Цитаты ещё загружаются…');
+                return;
+            }
+            const randomIndex = Math.floor(Math.random() * quotes.length);
+            currentQuote = quotes[randomIndex];
+            document.getElementById('quote').textContent = currentQuote;
+        }
+
+        const text = buildShareText();
+
+        // Нативное меню «Поделиться» (мобильные и часть десктопов)
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Сенека — мудрость стоика',
+                    text: text,
+                    url: SITE_URL
+                });
+                return;
+            } catch (err) {
+                // Пользователь отменил — тихо выходим
+                if (err && err.name === 'AbortError') return;
+                // Иначе пробуем скопировать
+            }
+        }
+
+        // Фолбэк — копируем в буфер обмена
+        try {
+            await copyToClipboard(text);
+            showToast('Цитата скопирована в буфер обмена');
+        } catch (err) {
+            showToast('Не удалось скопировать цитату');
+        }
+    }
+
     document.getElementById('btn').addEventListener('click', showRandomQuote);
+    document.getElementById('shareBtn').addEventListener('click', shareQuote);
 </script>
 
 </body>
