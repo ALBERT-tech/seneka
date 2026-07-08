@@ -7,4 +7,5 @@
 /og-image.jpg /og-image.jpg 200
 /favicon.svg /favicon.svg 200
 /apple-touch-icon.png /apple-touch-icon.png 200
+/stories/* /stories/:splat 200
 /* /index.html 200

@@ -62,6 +62,9 @@
     
     <title>Сенека — мудрость стоика</title>
 
+    <!-- Telegram Mini App SDK — нужен для публикации в историю внутри Telegram -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
     <style>
         :root {
             --bg-color: #f4e4bc; /* Цвет старой бумаги */
@@ -693,9 +696,17 @@
     let quotes = [];
     let isLoaded = false;
     let currentQuote = '';
+    let currentIndex = -1;
 
     const SITE_URL = 'https://seneka.netlify.app';
     const BOT_URL = 'https://t.me/seneka_1_bot';
+
+    // Инициализация Telegram Mini App (если открыто внутри Telegram)
+    const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+    const inTelegram = !!(tg && tg.platform && tg.platform !== 'unknown');
+    if (tg) {
+        try { tg.ready(); tg.expand(); } catch (e) {}
+    }
 
     try {
         quotes = JSON.parse(document.getElementById('quotes-data').textContent)
@@ -723,6 +734,7 @@
 
         setTimeout(() => {
             const randomIndex = Math.floor(Math.random() * quotes.length);
+            currentIndex = randomIndex;
             currentQuote = quotes[randomIndex];
             quoteElement.textContent = currentQuote;
             quoteElement.style.opacity = '1';
@@ -894,19 +906,45 @@
 
     // Поделиться цитатой-картинкой (для истории Telegram) с фолбэками
     async function shareQuote() {
-        // Если цитата ещё не выбрана — сначала показываем случайную
-        if (!currentQuote) {
+        // Если цитата ещё не выбрана — сначала выбираем случайную
+        if (currentIndex < 0 || !currentQuote) {
             if (!isLoaded || quotes.length === 0) {
                 showToast('Цитаты ещё загружаются…');
                 return;
             }
-            const randomIndex = Math.floor(Math.random() * quotes.length);
-            currentQuote = quotes[randomIndex];
+            currentIndex = Math.floor(Math.random() * quotes.length);
+            currentQuote = quotes[currentIndex];
             document.getElementById('quote').textContent = currentQuote;
         }
 
         const text = buildShareText();
 
+        // === A. Внутри Telegram (Mini App) ===
+        if (inTelegram && tg) {
+            const storyUrl = SITE_URL + '/stories/' + currentIndex + '.jpg';
+
+            // A1) Публикация готовой картинки в историю (мобильный Telegram)
+            const storySupported = typeof tg.shareToStory === 'function' &&
+                (!tg.isVersionAtLeast || tg.isVersionAtLeast('8.0'));
+            if (storySupported) {
+                try {
+                    tg.shareToStory(storyUrl, { text: 'Больше мудрости — @seneka_1_bot' });
+                    return;
+                } catch (err) {
+                    console.error('shareToStory недоступен:', err);
+                }
+            }
+
+            // A2) Фолбэк в Telegram (напр. Web, где истории может не быть):
+            //     переслать цитату + ссылку на бота в выбранный чат
+            if (typeof tg.openTelegramLink === 'function') {
+                tg.openTelegramLink('https://t.me/share/url?url=' +
+                    encodeURIComponent(BOT_URL) + '&text=' + encodeURIComponent(text));
+                return;
+            }
+        }
+
+        // === B. Обычный браузер ===
         // Готовим картинку
         let file = null;
         try {
@@ -916,7 +954,7 @@
             console.error('Не удалось нарисовать картинку:', err);
         }
 
-        // 1) Делимся картинкой: на телефоне откроется меню → Telegram → «В историю»
+        // B1) Делимся картинкой: на телефоне откроется меню → Telegram → «В историю»
         if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({ files: [file], text: text });
@@ -926,7 +964,7 @@
             }
         }
 
-        // 2) Нативное меню «Поделиться» без картинки (текст + ссылка)
+        // B2) Нативное меню «Поделиться» без картинки (текст + ссылка)
         if (navigator.share) {
             try {
                 await navigator.share({ title: 'Сенека — мудрость стоика', text: text, url: SITE_URL });
@@ -936,7 +974,7 @@
             }
         }
 
-        // 3) Фолбэк (десктоп): сохраняем картинку и копируем текст
+        // B3) Фолбэк (десктоп): сохраняем картинку и копируем текст
         if (file) {
             downloadBlob(file, 'seneca.png');
             try { await copyToClipboard(text); } catch (e) {}
