@@ -926,8 +926,7 @@
             typeof tg.shareToStory === 'function' &&
             (!tg.isVersionAtLeast || tg.isVersionAtLeast('8.0'))) {
             try {
-                tg.shareToStory(SITE_URL + '/stories/' + currentIndex + '.jpg',
-                    { text: 'Больше мудрости — @seneka_1_bot' });
+                tg.shareToStory(SITE_URL + '/stories/' + currentIndex + '.jpg');
                 return;
             } catch (err) {
                 console.error('shareToStory:', err);
