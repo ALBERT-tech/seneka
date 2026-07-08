@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="12" fill="#f4e4bc"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="9" fill="none" stroke="#2c1810" stroke-width="3"/>
+  <!-- Греческая буква Сигма (Σ) -->
+  <path d="M46 15 H19 L33 32 L19 49 H46"
+        fill="none" stroke="#2c1810" stroke-width="6"
+        stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
