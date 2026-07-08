@@ -35,10 +35,15 @@ jobs:
           PORT="${{ secrets.SSH_PORT || '22' }}"
           ssh-keyscan -p "$PORT" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
+      # ВНИМАНИЕ: DEPLOY_PATH должен быть ОТДЕЛЬНЫМ каталогом только для этого
+      # сайта (напр. /var/www/seneka), НЕ общим с другими проектами.
+      # --delete намеренно НЕ используется, чтобы исключить удаление чужих файлов
+      # на боевом сервере. (Устаревшие картинки историй, если цитат станет меньше,
+      # просто останутся неиспользуемыми — это безопасно.)
       - name: Deploy site via rsync
         run: |
           PORT="${{ secrets.SSH_PORT || '22' }}"
-          rsync -az --delete \
+          rsync -az \
             --exclude '.git' \
             --exclude '.github' \
             --exclude 'tools' \
