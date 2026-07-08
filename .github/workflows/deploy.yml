@@ -1,0 +1,48 @@
+name: Deploy to VPS
+
+# Раскатывает сайт на ваш сервер по SSH при каждом push в main.
+# SSH выполняет раннер GitHub (не песочница ассистента); приватный ключ
+# и адрес сервера хранятся в GitHub Secrets и в код не попадают.
+#
+# Нужные секреты (Settings -> Secrets and variables -> Actions -> New secret):
+#   SSH_PRIVATE_KEY  — приватный ключ деплой-пары (весь текст, включая BEGIN/END)
+#   SSH_HOST         — IP или домен сервера (напр. 89.0.0.0 или app.example.ru)
+#   SSH_USER         — пользователь на сервере (напр. root или deploy)
+#   DEPLOY_PATH      — каталог веб-рута (напр. /var/www/seneka)
+#   SSH_PORT         — порт SSH (необязательно; по умолчанию 22)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${{ secrets.SSH_PORT || '22' }}"
+          ssh-keyscan -p "$PORT" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy site via rsync
+        run: |
+          PORT="${{ secrets.SSH_PORT || '22' }}"
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'tools' \
+            --exclude 'netlify.toml' \
+            --exclude '_redirects' \
+            -e "ssh -p $PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/"
