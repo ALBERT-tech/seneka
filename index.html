@@ -698,7 +698,9 @@
     let currentQuote = '';
     let currentIndex = -1;
 
-    const SITE_URL = 'https://seneka.netlify.app';
+    // Адрес сайта берём от текущего домена — так картинки для истории
+    // всегда с того же хоста, откуда открыт Mini App (работает на любом хостинге)
+    const SITE_URL = window.location.origin || (location.protocol + '//' + location.host);
     const BOT_URL = 'https://t.me/seneka_1_bot';
 
     // Инициализация Telegram Mini App (если открыто внутри Telegram)
